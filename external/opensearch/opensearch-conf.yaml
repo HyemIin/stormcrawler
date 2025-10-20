@@ -114,6 +114,8 @@ config:
   opensearch.status.recentDate.increase: -1
   opensearch.status.recentDate.min.gap: -1
 
+  # Caffeine cache specification for the waitAck cache used in StatusUpdaterBolt.
+  opensearch.status.waitack.cache.spec: "maximumSize=10000,expireAfterWrite=60s"
   topology.metrics.consumer.register:
        - class: "org.apache.stormcrawler.opensearch.metrics.MetricsConsumer"
          parallelism.hint: 1

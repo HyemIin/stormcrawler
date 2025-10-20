@@ -160,11 +160,16 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             fieldNameForRoutingKey = fieldNameForRoutingKey.replaceAll("\\.", "%2E");
         }
 
+        String waitAckSpec =
+            ConfUtils.getString(
+                stormConf,
+                "opensearch.status.waitack.cache.spec",
+                "maximumSize=10000,expireAfterWrite=60s");
+
         waitAck =
-                Caffeine.newBuilder()
-                        .expireAfterWrite(60, TimeUnit.SECONDS)
-                        .removalListener(this)
-                        .build();
+            Caffeine.from(waitAckSpec)
+                .removalListener(this)
+                .build();
 
         int metrics_time_bucket_secs = 30;
 
