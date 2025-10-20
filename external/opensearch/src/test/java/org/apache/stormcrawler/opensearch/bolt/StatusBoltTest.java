@@ -127,21 +127,14 @@ class StatusBoltTest extends AbstractOpenSearchTest {
 
     @Test
     public void testWaitAckCacheSpecAppliedFromConfig() throws Exception {
-        // ✅ 1. 기본 설정 — 캐시 스펙 지정
         Map<String, Object> conf = new HashMap<>();
         conf.put("opensearch.status.waitack.cache.spec", "maximumSize=10,expireAfterWrite=1s");
-
-        // ✅ 2. 분기 커버: routing 필드 / 주소값 설정 / scheduler 추가
         conf.put("opensearch.status.routing.fieldname", "metadata.key");
         conf.put("scheduler.class", "org.apache.stormcrawler.persistence.DefaultScheduler");
-        // 일부러 존재하지 않는 주소 → OpenSearchConnection 예외 분기까지 커버
-        conf.put("opensearch.status.addresses", "invalidhost:9200");
 
-        // ✅ 3. Mock 객체 생성
         TopologyContext mockContext = Mockito.mock(TopologyContext.class);
         OutputCollector mockCollector = Mockito.mock(OutputCollector.class);
 
-        // ✅ 4. prepare() 실행 — 캐시 및 예외 분기 모두 커버
         StatusUpdaterBolt bolt = new StatusUpdaterBolt();
         try {
             bolt.prepare(conf, mockContext, mockCollector);
@@ -150,12 +143,10 @@ class StatusBoltTest extends AbstractOpenSearchTest {
             assertTrue(e.getMessage().contains("Can't connect"));
         }
 
-        // ✅ 5. waitAck 필드 접근 및 캐시 타입 검증
         Field field = StatusUpdaterBolt.class.getDeclaredField("waitAck");
         field.setAccessible(true);
         Object cache = field.get(bolt);
 
-        assertNotNull((String)cache, "waitAck cache should be initialized from spec");
         assertTrue(cache.getClass().getName().toLowerCase().contains("caffeine"));
     }
 }
