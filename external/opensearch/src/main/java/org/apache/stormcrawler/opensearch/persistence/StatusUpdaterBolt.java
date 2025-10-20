@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
@@ -80,6 +79,9 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
     private static final String OSStatusRoutingParamName = Constants.PARAMPREFIX + "%s.routing";
     private static final String OSStatusRoutingFieldParamName =
             Constants.PARAMPREFIX + "%s.routing.fieldname";
+
+    private static final String OSStatusWaitAckCacheSpecParamName =
+            Constants.PARAMPREFIX + "%s.waitack.cache.spec";
 
     private boolean routingFieldNameInMetadata = false;
 
@@ -159,12 +161,14 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             // periods are not allowed in - replace with %2E
             fieldNameForRoutingKey = fieldNameForRoutingKey.replaceAll("\\.", "%2E");
         }
+        String defaultSpec = "maximumSize=10000,expireAfterWrite=60s";
+        String cacheSpec =
+                ConfUtils.getString(
+                        stormConf,
+                        String.format(Locale.ROOT, OSStatusWaitAckCacheSpecParamName, OSBoltType),
+                        defaultSpec);
 
-        waitAck =
-                Caffeine.newBuilder()
-                        .expireAfterWrite(60, TimeUnit.SECONDS)
-                        .removalListener(this)
-                        .build();
+        waitAck = Caffeine.from(cacheSpec).removalListener(this).build();
 
         int metrics_time_bucket_secs = 30;
 

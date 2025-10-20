@@ -271,6 +271,9 @@ config:
   status.updater.use.cache: true
   status.updater.cache.spec: "maximumSize=10000,expireAfterAccess=1h"
 
+  # Caffeine cache used by OpenSearch StatusUpdaterBolt to store tuples awaiting acknowledgment.
+  opensearch.status.waitack.cache.spec: "maximumSize=10000,expireAfterWrite=60s"
+
   # Can also take "MINUTE" or "HOUR"
   status.updater.unit.round.date: "SECOND"
 
