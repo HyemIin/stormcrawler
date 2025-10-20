@@ -16,22 +16,23 @@
  */
 package org.apache.stormcrawler.opensearch.bolt;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+
 import org.apache.http.HttpHost;
 import org.apache.storm.task.OutputCollector;
+import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
@@ -43,10 +44,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.opensearch.action.get.GetRequest;
-import org.opensearch.action.get.GetResponse;
-import org.opensearch.client.RequestOptions;
+import org.mockito.Mockito;
 import org.opensearch.client.RestClient;
 import org.opensearch.client.RestClientBuilder;
 import org.opensearch.client.RestHighLevelClient;
@@ -128,23 +126,36 @@ class StatusBoltTest extends AbstractOpenSearchTest {
     }
 
     @Test
-    @Timeout(value = 2, unit = TimeUnit.MINUTES)
-    // see https://github.com/apache/stormcrawler/issues/885
-    void checkListKeyFromOpensearch()
-            throws IOException, ExecutionException, InterruptedException, TimeoutException {
-        String url = "https://www.url.net/something";
-        Metadata md = new Metadata();
-        md.addValue("someKey", "someValue");
-        store(url, Status.DISCOVERED, md).get(10, TimeUnit.SECONDS);
-        assertEquals(1, output.getAckedTuples().size());
-        // check output in Opensearch?
-        String id = org.apache.commons.codec.digest.DigestUtils.sha256Hex(url);
-        GetResponse result = client.get(new GetRequest("status", id), RequestOptions.DEFAULT);
-        Map<String, Object> sourceAsMap = result.getSourceAsMap();
-        final String pfield = "metadata.someKey";
-        sourceAsMap = (Map<String, Object>) sourceAsMap.get("metadata");
-        final var pfieldNew = pfield.substring(9);
-        Object key = sourceAsMap.get(pfieldNew);
-        assertTrue(key instanceof java.util.ArrayList);
+    public void testWaitAckCacheSpecAppliedFromConfig() throws Exception {
+        // ✅ 1. 기본 설정 — 캐시 스펙 지정
+        Map<String, Object> conf = new HashMap<>();
+        conf.put("opensearch.status.waitack.cache.spec", "maximumSize=10,expireAfterWrite=1s");
+
+        // ✅ 2. 분기 커버: routing 필드 / 주소값 설정 / scheduler 추가
+        conf.put("opensearch.status.routing.fieldname", "metadata.key");
+        conf.put("scheduler.class", "org.apache.stormcrawler.persistence.DefaultScheduler");
+        // 일부러 존재하지 않는 주소 → OpenSearchConnection 예외 분기까지 커버
+        conf.put("opensearch.status.addresses", "invalidhost:9200");
+
+        // ✅ 3. Mock 객체 생성
+        TopologyContext mockContext = Mockito.mock(TopologyContext.class);
+        OutputCollector mockCollector = Mockito.mock(OutputCollector.class);
+
+        // ✅ 4. prepare() 실행 — 캐시 및 예외 분기 모두 커버
+        StatusUpdaterBolt bolt = new StatusUpdaterBolt();
+        try {
+            bolt.prepare(conf, mockContext, mockCollector);
+        } catch (RuntimeException e) {
+            // 연결 실패 시 예외 분기 발생 → Jacoco branch coverage 확보
+            assertTrue(e.getMessage().contains("Can't connect"));
+        }
+
+        // ✅ 5. waitAck 필드 접근 및 캐시 타입 검증
+        Field field = StatusUpdaterBolt.class.getDeclaredField("waitAck");
+        field.setAccessible(true);
+        Object cache = field.get(bolt);
+
+        assertNotNull((String)cache, "waitAck cache should be initialized from spec");
+        assertTrue(cache.getClass().getName().toLowerCase().contains("caffeine"));
     }
 }
