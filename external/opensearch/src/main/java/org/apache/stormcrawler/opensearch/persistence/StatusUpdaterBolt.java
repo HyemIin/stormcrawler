@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
@@ -161,15 +160,12 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
         }
 
         String waitAckSpec =
-            ConfUtils.getString(
-                stormConf,
-                "opensearch.status.waitack.cache.spec",
-                "maximumSize=10000,expireAfterWrite=60s");
+                ConfUtils.getString(
+                        stormConf,
+                        "opensearch.status.waitack.cache.spec",
+                        "maximumSize=10000,expireAfterWrite=60s");
 
-        waitAck =
-            Caffeine.from(waitAckSpec)
-                .removalListener(this)
-                .build();
+        waitAck = Caffeine.from(waitAckSpec).removalListener(this).build();
 
         int metrics_time_bucket_secs = 30;
 

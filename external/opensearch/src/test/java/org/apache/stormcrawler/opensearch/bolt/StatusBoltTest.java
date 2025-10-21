@@ -17,7 +17,6 @@
 package org.apache.stormcrawler.opensearch.bolt;
 
 import static org.junit.Assert.*;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -29,7 +28,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-
 import org.apache.http.HttpHost;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
