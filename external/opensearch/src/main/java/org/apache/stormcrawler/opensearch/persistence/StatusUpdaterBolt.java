@@ -163,7 +163,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
                 ConfUtils.getString(
                         stormConf,
                         "opensearch.status.waitack.cache.spec",
-                        "maximumSize=10000,expireAfterWrite=60s");
+                        "maximumSize=10000,expireAfterWrite=300s");
 
         waitAck = Caffeine.from(waitAckSpec).removalListener(this).build();
 

@@ -16,21 +16,22 @@
  */
 package org.apache.stormcrawler.opensearch.bolt;
 
-import static org.junit.Assert.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.http.HttpHost;
 import org.apache.storm.task.OutputCollector;
-import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
 import org.apache.stormcrawler.Metadata;
 import org.apache.stormcrawler.TestOutputCollector;
@@ -42,7 +43,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.Timeout;
+import org.opensearch.action.get.GetRequest;
+import org.opensearch.action.get.GetResponse;
+import org.opensearch.client.RequestOptions;
 import org.opensearch.client.RestClient;
 import org.opensearch.client.RestClientBuilder;
 import org.opensearch.client.RestHighLevelClient;
@@ -124,27 +128,23 @@ class StatusBoltTest extends AbstractOpenSearchTest {
     }
 
     @Test
-    public void testWaitAckCacheSpecAppliedFromConfig() throws Exception {
-        Map<String, Object> conf = new HashMap<>();
-        conf.put("opensearch.status.waitack.cache.spec", "maximumSize=10,expireAfterWrite=1s");
-        conf.put("opensearch.status.routing.fieldname", "metadata.key");
-        conf.put("scheduler.class", "org.apache.stormcrawler.persistence.DefaultScheduler");
-
-        TopologyContext mockContext = Mockito.mock(TopologyContext.class);
-        OutputCollector mockCollector = Mockito.mock(OutputCollector.class);
-
-        StatusUpdaterBolt bolt = new StatusUpdaterBolt();
-        try {
-            bolt.prepare(conf, mockContext, mockCollector);
-        } catch (RuntimeException e) {
-            // 연결 실패 시 예외 분기 발생 → Jacoco branch coverage 확보
-            assertTrue(e.getMessage().contains("Can't connect"));
-        }
-
-        Field field = StatusUpdaterBolt.class.getDeclaredField("waitAck");
-        field.setAccessible(true);
-        Object cache = field.get(bolt);
-
-        assertTrue(cache.getClass().getName().toLowerCase().contains("caffeine"));
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    // see https://github.com/apache/stormcrawler/issues/885
+    void checkListKeyFromOpensearch()
+            throws IOException, ExecutionException, InterruptedException, TimeoutException {
+        String url = "https://www.url.net/something";
+        Metadata md = new Metadata();
+        md.addValue("someKey", "someValue");
+        store(url, Status.DISCOVERED, md).get(10, TimeUnit.SECONDS);
+        assertEquals(1, output.getAckedTuples().size());
+        // check output in Opensearch?
+        String id = org.apache.commons.codec.digest.DigestUtils.sha256Hex(url);
+        GetResponse result = client.get(new GetRequest("status", id), RequestOptions.DEFAULT);
+        Map<String, Object> sourceAsMap = result.getSourceAsMap();
+        final String pfield = "metadata.someKey";
+        sourceAsMap = (Map<String, Object>) sourceAsMap.get("metadata");
+        final var pfieldNew = pfield.substring(9);
+        Object key = sourceAsMap.get(pfieldNew);
+        assertTrue(key instanceof java.util.ArrayList);
     }
 }
