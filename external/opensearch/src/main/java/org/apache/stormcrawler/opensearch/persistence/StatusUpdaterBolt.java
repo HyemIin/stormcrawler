@@ -159,11 +159,14 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
             fieldNameForRoutingKey = fieldNameForRoutingKey.replaceAll("\\.", "%2E");
         }
 
+        String defaultSpec = String.format("maximumSize=10000,expireAfterWrite=%ds",
+            ConfUtils.getInt(stormConf, "topology.message.timeout.secs", 300));
+
         String waitAckSpec =
                 ConfUtils.getString(
                         stormConf,
                         "opensearch.status.waitack.cache.spec",
-                        "maximumSize=10000,expireAfterWrite=300s");
+                        defaultSpec);
 
         waitAck = Caffeine.from(waitAckSpec).removalListener(this).build();
 
