@@ -161,6 +161,7 @@ public class StatusUpdaterBolt extends AbstractStatusUpdaterBolt
 
         String defaultSpec =
                 String.format(
+                        Locale.ROOT,
                         "expireAfterWrite=%ds",
                         ConfUtils.getInt(stormConf, "topology.message.timeout.secs", 300));
 
