@@ -115,8 +115,8 @@ config:
   opensearch.status.recentDate.min.gap: -1
 
   # Caffeine cache specification for the waitAck cache used in StatusUpdaterBolt.
-  # Set expireAfterWrite to match topology.message.timeout.secs (default: 300s),
-  opensearch.status.waitack.cache.spec: "maximumSize=10000,expireAfterWrite=300s"
+  # If not set, the value of topology.message.timeout.secs is used for expireAfterWrite (default: 300s)
+  # opensearch.status.waitack.cache.spec: "maximumSize=10000,expireAfterWrite=300s"
 
   topology.metrics.consumer.register:
        - class: "org.apache.stormcrawler.opensearch.metrics.MetricsConsumer"
